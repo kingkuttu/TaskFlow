@@ -1,31 +1,41 @@
 from fastapi import HTTPException
-from app.schemas.task import Task, TaskCreate
+from sqlalchemy.orm import Session
 
-tasks: list[Task] = []
+from app.models.task import Task
+from app.repositories import task_repository
+from app.schemas.task import TaskCreate
 
-def get_tasks() -> list[Task]:
-    return tasks
+def get_tasks(db: Session) -> list[Task]:
+    return task_repository.get_tasks(db)
 
-def get_task(task_id: int) -> Task:
-    for task in tasks:
-        if task.id == task_id:
-            return task
+def get_task(db: Session, task_id: int) -> Task:
+    task = task_repository.get_task(db, task_id)
 
-    raise HTTPException(status_code=404, detail="Task not found")
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
 
-def create_task(task: TaskCreate) -> Task:
-    new_id = len(tasks) + 1
-    new_task = Task(id=new_id, title=task.title)
-    tasks.append(new_task)
+    return task
 
-    return new_task
+def create_task(db: Session, task_create: TaskCreate) -> Task:
+    task = Task(title=task_create.title)
 
-def update_task(task_id: int, task: TaskCreate) -> Task:
-    found_task = get_task(task_id)
-    found_task.title = task.title
-    
-    return found_task
+    task_repository.create_task(db, task)
+    db.commit()
 
-def delete_task(task_id: int) -> None:
-    found_task = get_task(task_id)
-    tasks.remove(found_task)
+    return task
+
+def update_task(db: Session, task_id: int, task_update: TaskCreate) -> Task:
+    task = get_task(db, task_id)
+
+    task.title = task_update.title
+
+    task_repository.update_task(db, task)
+    db.commit()
+
+    return task
+
+def delete_task(db: Session, task_id: int) -> None:
+    task = get_task(db, task_id)
+
+    task_repository.delete_task(db, task)
+    db.commit()
